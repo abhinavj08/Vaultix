@@ -1,9 +1,11 @@
 import React from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
 
-const MonthPicker = ({ month, year, onChange }) => {
-  const date = new Date(year, month - 1);
-  const monthName = date.toLocaleString('default', { month: 'long' });
+export default function MonthPicker({ month, year, onChange }) {
+  const months = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ];
 
   const handlePrev = () => {
     if (month === 1) {
@@ -22,24 +24,27 @@ const MonthPicker = ({ month, year, onChange }) => {
   };
 
   return (
-    <div className="flex items-center justify-center space-x-4 mb-6">
+    <div className="glass-card inline-flex items-center p-1.5 border-white/10 shadow-lg">
       <button 
         onClick={handlePrev}
-        className="p-2 rounded-full hover:bg-gray-200 text-gray-600 transition-colors focus:outline-none"
+        className="btn-ghost p-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
       >
-        <ChevronLeft className="h-5 w-5" />
+        <ChevronLeft className="w-5 h-5" />
       </button>
-      <div className="px-6 py-2 bg-white rounded-full shadow-sm border border-gray-100 font-semibold text-gray-800 min-w-[160px] text-center">
-        {monthName} {year}
+      
+      <div className="flex items-center gap-2 px-4 min-w-[160px] justify-center">
+        <Calendar className="w-4 h-4 text-violet-400" />
+        <span className="text-white font-semibold whitespace-nowrap">
+          {months[month - 1]} {year}
+        </span>
       </div>
+
       <button 
         onClick={handleNext}
-        className="p-2 rounded-full hover:bg-gray-200 text-gray-600 transition-colors focus:outline-none"
+        className="btn-ghost p-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
       >
-        <ChevronRight className="h-5 w-5" />
+        <ChevronRight className="w-5 h-5" />
       </button>
     </div>
   );
-};
-
-export default MonthPicker;
+}

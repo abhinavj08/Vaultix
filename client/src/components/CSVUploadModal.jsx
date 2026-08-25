@@ -1,134 +1,228 @@
-import React, { useState, useRef } from 'react';
-import { Upload, Loader2, CheckCircle } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { X, Upload, FileText, Loader2, CheckCircle2 } from 'lucide-react';
 import { uploadCSV } from '../api';
 
-const CSVUploadModal = ({ isOpen, onClose, onSuccess }) => {
+export default function CSVUploadModal({ isOpen, onClose, onSuccess }) {
   const [file, setFile] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  const [successMsg, setSuccessMsg] = useState('');
-  const [isDragOver, setIsDragOver] = useState(false);
+  const [successCount, setSuccessCount] = useState(null);
   const fileInputRef = useRef(null);
+
+  // Close on Escape key
+  useEffect(() => {
+    const handleEsc = (e) => {
+      if (e.key === 'Escape' && !isLoading) onClose();
+    };
+    window.addEventListener('keydown', handleEsc);
+    return () => window.removeEventListener('keydown', handleEsc);
+  }, [onClose, isLoading]);
 
   if (!isOpen) return null;
 
   const handleDragOver = (e) => {
     e.preventDefault();
-    setIsDragOver(true);
+    setIsDragging(true);
   };
 
-  const handleDragLeave = (e) => {
-    e.preventDefault();
-    setIsDragOver(false);
+  const handleDragLeave = () => {
+    setIsDragging(false);
   };
 
   const handleDrop = (e) => {
     e.preventDefault();
-    setIsDragOver(false);
-    const droppedFile = e.dataTransfer.files[0];
-    if (droppedFile && droppedFile.name.endsWith('.csv')) {
-      setFile(droppedFile);
-      setError('');
-    } else {
-      setError('Please upload a valid CSV file.');
+    setIsDragging(false);
+    setError('');
+    
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const droppedFile = e.dataTransfer.files[0];
+      validateAndSetFile(droppedFile);
     }
   };
 
   const handleFileChange = (e) => {
-    const selectedFile = e.target.files[0];
-    if (selectedFile) {
-      setFile(selectedFile);
-      setError('');
+    setError('');
+    if (e.target.files && e.target.files.length > 0) {
+      validateAndSetFile(e.target.files[0]);
     }
+  };
+
+  const validateAndSetFile = (selectedFile) => {
+    if (selectedFile.type !== 'text/csv' && !selectedFile.name.endsWith('.csv')) {
+      setError('Please select a valid CSV file.');
+      return;
+    }
+    setFile(selectedFile);
+  };
+
+  const clearFile = () => {
+    setFile(null);
+    setError('');
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const formatFileSize = (bytes) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
   const handleUpload = async () => {
     if (!file) return;
-    setLoading(true);
+    
+    setIsLoading(true);
     setError('');
     
+    const formData = new FormData();
+    formData.append('file', file);
+    
     try {
-      const res = await uploadCSV(file);
-      setSuccessMsg(`${res.count || 'Multiple'} transactions imported successfully!`);
+      const response = await uploadCSV(formData);
+      // Assuming response returns the number of imported transactions
+      const count = response?.data?.count || response?.count || 0;
+      setSuccessCount(count);
+      
+      // Auto close and refresh after a delay
       setTimeout(() => {
         onSuccess();
-        onClose();
       }, 2000);
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to upload CSV');
-      setLoading(false);
+      console.error(err);
+      setError(err.response?.data?.message || 'Failed to process CSV file. Please check the format and try again.');
+      setIsLoading(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
-      <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-        <div className="fixed inset-0 bg-black/50 transition-opacity" aria-hidden="true" onClick={onClose}></div>
-
-        <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+      {/* Overlay click to close */}
+      <div className="absolute inset-0" onClick={() => !isLoading && onClose()}></div>
+      
+      {/* Modal card */}
+      <div className="glass-card max-w-lg w-full relative z-10 animate-in fade-in zoom-in-95 duration-200">
         
-        <div className="inline-block align-bottom bg-white rounded-xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
-          <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-            <h3 className="text-lg leading-6 font-semibold text-gray-900 mb-5">
-              Upload Bank Statement
-            </h3>
-            
-            {error && <div className="mb-4 text-sm text-red-600 bg-red-50 p-3 rounded-md">{error}</div>}
-            {successMsg && <div className="mb-4 text-sm text-emerald-600 bg-emerald-50 p-3 rounded-md flex items-center"><CheckCircle className="h-4 w-4 mr-2"/>{successMsg}</div>}
-            
-            {!successMsg && (
+        {/* Header */}
+        <div className="p-6 border-b border-white/5 relative">
+          <h2 className="text-xl font-bold text-white mb-1">Upload Bank Statement</h2>
+          <p className="text-sm text-slate-400">
+            Import transactions from a CSV file
+          </p>
+          {!isLoading && (
+            <button 
+              onClick={onClose}
+              className="absolute top-6 right-6 text-slate-500 hover:text-white transition-colors bg-white/5 hover:bg-white/10 p-1.5 rounded-full"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          )}
+        </div>
+
+        {/* Body */}
+        <div className="p-6 space-y-4">
+          {error && (
+            <div className="bg-rose-500/10 border border-rose-500/20 rounded-xl p-3 text-rose-400 text-sm">
+              {error}
+            </div>
+          )}
+          
+          {successCount !== null ? (
+            <div className="py-8 flex flex-col items-center justify-center text-center animate-in fade-in zoom-in duration-300">
+              <div className="h-16 w-16 bg-emerald-500/20 rounded-full flex items-center justify-center mb-4">
+                <CheckCircle2 className="h-8 w-8 text-emerald-400" />
+              </div>
+              <h3 className="text-xl font-semibold text-emerald-400 mb-2">Upload Successful!</h3>
+              <p className="text-slate-300">
+                {successCount} transactions imported successfully.
+              </p>
+            </div>
+          ) : !file ? (
+            <>
+              {/* Drag & Drop Zone */}
               <div 
-                className={`mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-dashed rounded-lg transition-colors cursor-pointer
-                  ${isDragOver ? 'border-indigo-500 bg-indigo-50' : 'border-gray-300 hover:border-indigo-400'}`}
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
-                onClick={() => fileInputRef.current.click()}
+                onClick={() => fileInputRef.current?.click()}
+                className={`border-2 border-dashed rounded-2xl p-8 text-center transition-all cursor-pointer ${
+                  isDragging 
+                    ? 'border-violet-500/50 bg-violet-500/5' 
+                    : 'border-white/10 hover:border-violet-500/50 hover:bg-violet-500/5'
+                }`}
               >
-                <div className="space-y-1 text-center">
-                  <Upload className="mx-auto h-12 w-12 text-gray-400" />
-                  <div className="flex text-sm text-gray-600 justify-center">
-                    <span className="relative rounded-md font-medium text-indigo-600 hover:text-indigo-500 focus-within:outline-none">
-                      <span>Click to browse</span>
-                    </span>
-                    <p className="pl-1">or drag & drop your CSV file here</p>
-                  </div>
-                  <p className="text-xs text-gray-500">Supported columns: Date, Description, Amount</p>
-                  <input 
-                    ref={fileInputRef}
-                    type="file"
-                    className="sr-only" 
-                    accept=".csv"
-                    onChange={handleFileChange}
-                  />
-                  {file && <p className="text-sm font-medium text-indigo-600 mt-2">{file.name} ({(file.size / 1024).toFixed(1)} KB)</p>}
+                <div className="flex justify-center mb-3">
+                  <Upload className={`h-12 w-12 transition-colors ${isDragging ? 'text-violet-400' : 'text-slate-500'}`} />
+                </div>
+                <p className="text-slate-300 mb-1 font-medium">Drag & drop your CSV file</p>
+                <p className="text-violet-400 hover:text-violet-300 text-sm">or browse files</p>
+                
+                <input 
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleFileChange}
+                  accept=".csv"
+                  className="hidden"
+                />
+              </div>
+              <p className="text-center text-xs text-slate-500">
+                Supported columns: Date, Description, Amount
+              </p>
+            </>
+          ) : (
+            /* Selected File Info */
+            <div className="glass bg-white/5 rounded-xl p-4 flex items-center justify-between border border-white/10">
+              <div className="flex items-center gap-3 overflow-hidden">
+                <div className="p-2 bg-violet-500/20 rounded-lg text-violet-400 shrink-0">
+                  <FileText className="w-6 h-6" />
+                </div>
+                <div className="overflow-hidden">
+                  <p className="text-sm font-medium text-white truncate">{file.name}</p>
+                  <p className="text-xs text-slate-400">{formatFileSize(file.size)}</p>
                 </div>
               </div>
-            )}
-          </div>
-          <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-            <button
-              type="button"
-              onClick={handleUpload}
-              disabled={!file || loading || !!successMsg}
-              className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Upload & Process
-            </button>
-            <button
-              type="button"
+              <button 
+                onClick={clearFile}
+                disabled={isLoading}
+                className="p-2 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors disabled:opacity-50"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        {successCount === null && (
+          <div className="p-6 border-t border-white/5 flex justify-end gap-3">
+            <button 
               onClick={onClose}
-              disabled={loading}
-              className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm transition-colors disabled:opacity-50"
+              className="btn-ghost"
+              disabled={isLoading}
             >
               Cancel
             </button>
+            <button 
+              onClick={handleUpload}
+              disabled={!file || isLoading}
+              className="btn-primary flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                <>
+                  <Upload className="w-4 h-4" />
+                  Upload & Process
+                </>
+              )}
+            </button>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
-};
-
-export default CSVUploadModal;
+}

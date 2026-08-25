@@ -1,98 +1,149 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
+import { Sliders, ChevronDown, ChevronUp, Loader2, Save } from 'lucide-react';
 import { updateBudgets } from '../api';
 
-const BudgetSettings = ({ budgets, month, year, onUpdate }) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const [localBudgets, setLocalBudgets] = useState([]);
-  const [loading, setLoading] = useState(false);
+const DEFAULT_CATEGORIES = [
+  { category: 'Food & Dining', defaultLimit: 5000 },
+  { category: 'Groceries', defaultLimit: 4000 },
+  { category: 'Transportation', defaultLimit: 3000 },
+  { category: 'Shopping', defaultLimit: 4000 },
+  { category: 'Bills & Utilities', defaultLimit: 5000 },
+  { category: 'Entertainment', defaultLimit: 2000 },
+  { category: 'Health & Fitness', defaultLimit: 2000 },
+  { category: 'Travel', defaultLimit: 5000 },
+  { category: 'Education', defaultLimit: 3000 },
+];
 
+export default function BudgetSettings({ budgets = [], month, year, onUpdate }) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [localBudgets, setLocalBudgets] = useState({});
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Initialize local budgets from props or defaults
   useEffect(() => {
+    const initial = {};
+    
+    // Fill with defaults first
+    DEFAULT_CATEGORIES.forEach(cat => {
+      initial[cat.category] = cat.defaultLimit;
+    });
+    
+    // Override with actual data
     if (budgets && budgets.length > 0) {
-      setLocalBudgets(budgets.map(b => ({
-        category: b.category,
-        limit: b.limit !== undefined ? b.limit : (b.amount || 0)
-      })));
-    } else {
-      setLocalBudgets([
-        { category: 'Groceries', limit: 5000 },
-        { category: 'Food & Dining', limit: 4000 },
-        { category: 'Transportation', limit: 2000 },
-        { category: 'Entertainment', limit: 1500 },
-        { category: 'Bills & Utilities', limit: 3000 },
-        { category: 'Shopping', limit: 2500 }
-      ]);
+      budgets.forEach(b => {
+        if (b.category) {
+          initial[b.category] = b.limit;
+        }
+      });
     }
+    
+    setLocalBudgets(initial);
   }, [budgets]);
 
-  const handleAmountChange = (index, value) => {
-    const newBudgets = [...localBudgets];
-    newBudgets[index].limit = Number(value);
-    setLocalBudgets(newBudgets);
+  const handleInputChange = (category, value) => {
+    setLocalBudgets(prev => ({
+      ...prev,
+      [category]: Number(value)
+    }));
   };
 
   const handleSave = async () => {
-    setLoading(true);
+    setIsSaving(true);
     try {
-      await updateBudgets(localBudgets, month, year);
-      onUpdate();
-      setIsOpen(false);
+      // Format array for API
+      const budgetsToSave = Object.entries(localBudgets).map(([category, limit]) => ({
+        category,
+        limit,
+        month,
+        year
+      }));
+      
+      await updateBudgets(budgetsToSave);
+      if (onUpdate) onUpdate();
+      
+      // Optionally close after save
+      // setIsExpanded(false);
     } catch (error) {
-      console.error("Failed to save budgets", error);
+      console.error('Failed to update budgets:', error);
+      alert('Failed to save budgets. Please try again.');
     } finally {
-      setLoading(false);
+      setIsSaving(false);
     }
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+    <div className="glass-card overflow-hidden">
+      {/* Toggle Header */}
       <button 
-        onClick={() => setIsOpen(!isOpen)}
-        className="w-full px-6 py-4 flex items-center justify-between bg-white hover:bg-gray-50 transition-colors focus:outline-none"
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="w-full p-6 flex items-center justify-between hover:bg-white/5 transition-colors text-left"
       >
-        <div className="flex items-center text-lg font-semibold text-gray-800">
-          <Settings className="h-5 w-5 mr-2 text-indigo-600" />
-          Budget Settings
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-violet-500/10 rounded-xl">
+            <Sliders className="w-5 h-5 text-violet-400" />
+          </div>
+          <span className="text-lg font-semibold text-white">Budget Settings</span>
         </div>
-        {isOpen ? <ChevronUp className="h-5 w-5 text-gray-400" /> : <ChevronDown className="h-5 w-5 text-gray-400" />}
+        <div className="text-slate-400">
+          {isExpanded ? (
+            <ChevronUp className="w-5 h-5 transition-transform" />
+          ) : (
+            <ChevronDown className="w-5 h-5 transition-transform" />
+          )}
+        </div>
       </button>
-      
-      {isOpen && (
-        <div className="px-6 pb-6 border-t border-gray-100 pt-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-6">
-            {localBudgets.map((b, index) => (
-              <div key={index} className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                <label className="block text-sm font-medium text-gray-700 mb-1">{b.category}</label>
-                <div className="relative rounded-md shadow-sm">
+
+      {/* Expanded Content */}
+      {isExpanded && (
+        <div className="border-t border-white/5 bg-black/20">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-6">
+            {Object.entries(localBudgets).map(([category, limit]) => (
+              <div 
+                key={category} 
+                className="bg-white/5 rounded-xl p-4 border border-white/5 hover:border-white/10 transition-colors"
+              >
+                <label className="block text-sm font-medium text-slate-300 mb-2 truncate" title={category}>
+                  {category}
+                </label>
+                <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <span className="text-gray-500 sm:text-sm">₹</span>
+                    <span className="text-slate-400 font-medium">₹</span>
                   </div>
                   <input
                     type="number"
-                    min="0"
                     step="100"
-                    className="block w-full pl-8 pr-3 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                    value={b.limit !== undefined ? b.limit : ''}
-                    onChange={(e) => handleAmountChange(index, e.target.value)}
+                    min="0"
+                    value={limit}
+                    onChange={(e) => handleInputChange(category, e.target.value)}
+                    className="input-dark w-full pl-8 py-2"
                   />
                 </div>
               </div>
             ))}
           </div>
-          <div className="flex justify-end">
+          
+          <div className="p-6 pt-2 flex justify-end">
             <button
               onClick={handleSave}
-              disabled={loading}
-              className="flex items-center justify-center px-6 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors disabled:opacity-70"
+              disabled={isSaving}
+              className="btn-primary flex items-center gap-2 px-6"
             >
-              {loading && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-              Save Budgets
+              {isSaving ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4" />
+                  Save Budgets
+                </>
+              )}
             </button>
           </div>
         </div>
       )}
     </div>
   );
-};
-
-export default BudgetSettings;
+}
