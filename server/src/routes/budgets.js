@@ -45,8 +45,8 @@ router.get('/', async (req, res) => {
     
     res.json({ budgets });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Internal Server Error' });
+    console.error('Error fetching budgets:', error);
+    res.status(500).json({ error: error.message || 'Internal Server Error' });
   }
 });
 
@@ -54,32 +54,40 @@ router.put('/', async (req, res) => {
   try {
     const { budgets, month, year } = req.body;
     
-    if (!budgets || !Array.isArray(budgets) || !month || !year) {
-      return res.status(400).json({ error: 'Missing required fields' });
+    if (!budgets || !Array.isArray(budgets)) {
+      return res.status(400).json({ error: 'Budgets array is required' });
     }
+
+    const now = new Date();
+    const targetMonth = month ? parseInt(month) : now.getMonth() + 1;
+    const targetYear = year ? parseInt(year) : now.getFullYear();
     
     const updatedBudgets = [];
     
     for (const b of budgets) {
       const { category, limit } = b;
+      if (!category) continue;
+      
+      const parsedLimit = parseFloat(limit);
+      const safeLimit = isNaN(parsedLimit) ? 0 : parsedLimit;
       
       const upserted = await prisma.budget.upsert({
         where: {
           userId_category_month_year: {
             userId: req.user.userId,
             category,
-            month,
-            year
+            month: targetMonth,
+            year: targetYear
           }
         },
         update: {
-          limit: parseFloat(limit)
+          limit: safeLimit
         },
         create: {
           category,
-          limit: parseFloat(limit),
-          month,
-          year,
+          limit: safeLimit,
+          month: targetMonth,
+          year: targetYear,
           userId: req.user.userId
         }
       });
@@ -88,8 +96,8 @@ router.put('/', async (req, res) => {
     
     res.json({ budgets: updatedBudgets });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Internal Server Error' });
+    console.error('Error updating budgets:', error);
+    res.status(500).json({ error: error.message || 'Internal Server Error' });
   }
 });
 
