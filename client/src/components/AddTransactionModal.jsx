@@ -42,6 +42,7 @@ export default function AddTransactionModal({ isOpen, onClose, onSuccess }) {
     } catch (err) {
       console.error(err);
       setError(err.response?.data?.message || 'Failed to add transaction. Please try again.');
+      setError(err.response?.data?.error || err.response?.data?.message || 'Failed to add transaction. Please try again.');
     } finally {
       setIsLoading(false);
     }

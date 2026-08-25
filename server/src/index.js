@@ -12,9 +12,15 @@ import budgetRoutes from './routes/budgets.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
-const CLIENT_URL = process.env.CLIENT_URL || 'http://localhost:5173';
 
-app.use(cors({ origin: CLIENT_URL }));
+// Allow all origins with credentials & full headers to avoid any CORS issues on Vercel/mobile
+app.use(cors({
+  origin: true,
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Origin', 'Accept']
+}));
+
 app.use(express.json());
 
 passport.use(new GoogleStrategy({
@@ -57,12 +63,12 @@ app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/budgets', budgetRoutes);
 
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok' });
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
 app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ error: 'Internal Server Error' });
+  console.error('Server error:', err);
+  res.status(500).json({ error: err.message || 'Internal Server Error' });
 });
 
 app.listen(PORT, () => {

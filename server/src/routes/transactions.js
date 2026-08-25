@@ -16,8 +16,8 @@ router.get('/', async (req, res) => {
     
     let dateFilter = {};
     if (month && year) {
-      const startDate = new Date(parseInt(year), parseInt(month) - 1, 1);
-      const endDate = new Date(parseInt(year), parseInt(month), 0, 23, 59, 59, 999);
+      const startDate = new Date(Date.UTC(parseInt(year), parseInt(month) - 1, 1, 0, 0, 0));
+      const endDate = new Date(Date.UTC(parseInt(year), parseInt(month), 0, 23, 59, 59, 999));
       
       dateFilter = {
         date: {
@@ -39,8 +39,8 @@ router.get('/', async (req, res) => {
     
     res.json({ transactions });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Internal Server Error' });
+    console.error('Error fetching transactions:', error);
+    res.status(500).json({ error: error.message || 'Internal Server Error' });
   }
 });
 
@@ -48,16 +48,26 @@ router.post('/', async (req, res) => {
   try {
     const { date, description, amount, type } = req.body;
     
-    if (!date || !description || amount === undefined || !type) {
-      return res.status(400).json({ error: 'All fields are required' });
+    if (!description || amount === undefined || amount === null || !type) {
+      return res.status(400).json({ error: 'Description, amount, and type are required' });
     }
+
+    const txDate = date ? new Date(date) : new Date();
     
-    const { category } = await categorizeTransaction(description);
+    let category = 'Other';
+    try {
+      const catResult = await categorizeTransaction(description);
+      if (catResult && catResult.category) {
+        category = catResult.category;
+      }
+    } catch (e) {
+      console.error('Categorization error during transaction creation:', e);
+    }
     
     const transaction = await prisma.transaction.create({
       data: {
-        date: new Date(date),
-        description,
+        date: txDate,
+        description: description.trim(),
         amount: parseFloat(amount),
         type,
         category,
@@ -67,8 +77,8 @@ router.post('/', async (req, res) => {
     
     res.status(201).json({ transaction });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Internal Server Error' });
+    console.error('Error creating transaction:', error);
+    res.status(500).json({ error: error.message || 'Internal Server Error' });
   }
 });
 
@@ -91,7 +101,13 @@ router.post('/upload', upload.single('file'), async (req, res) => {
       
       const results = await Promise.allSettled(
         batch.map(async (t) => {
-          const { category } = await categorizeTransaction(t.description);
+          let category = 'Other';
+          try {
+            const res = await categorizeTransaction(t.description);
+            if (res && res.category) category = res.category;
+          } catch (err) {
+            console.error('Error categorizing row:', err);
+          }
           return {
             ...t,
             category,
@@ -107,7 +123,7 @@ router.post('/upload', upload.single('file'), async (req, res) => {
       }
       
       if (i + batchSize < parsedTransactions.length) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await new Promise(resolve => setTimeout(resolve, 600));
       }
     }
     
@@ -117,8 +133,8 @@ router.post('/upload', upload.single('file'), async (req, res) => {
     
     res.status(201).json({ count: created.length, transactions: created });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Internal Server Error' });
+    console.error('Error uploading statement:', error);
+    res.status(500).json({ error: error.message || 'Internal Server Error' });
   }
 });
 
@@ -143,8 +159,8 @@ router.delete('/:id', async (req, res) => {
     
     res.status(204).send();
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Internal Server Error' });
+    console.error('Error deleting transaction:', error);
+    res.status(500).json({ error: error.message || 'Internal Server Error' });
   }
 });
 
