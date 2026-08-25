@@ -1,5 +1,5 @@
 import React from 'react';
-import { IndianRupee, TrendingUp, TrendingDown, Wallet, Percent, Sparkles, PieChart as PieChartIcon, BarChart3 } from 'lucide-react';
+import { IndianRupee, TrendingUp, TrendingDown, Wallet, Percent, Sparkles, PieChart as PieChartIcon, BarChart3, AlertCircle, CheckCircle } from 'lucide-react';
 import { PieChart, Pie, Cell, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from 'recharts';
 
 export default function Dashboard({ data }) {
@@ -7,7 +7,7 @@ export default function Dashboard({ data }) {
     totalIncome = 0, 
     totalExpenses = 0, 
     netBalance = 0, 
-    tip: aiTip = 'Analyze your spending patterns to get personalized insights.', 
+    tip: aiTip = 'Track your daily expenses closely in ₹ to build healthy saving habits.', 
     spendingByCategory = [], 
     budgetVsActual = [] 
   } = data || {};
@@ -20,13 +20,13 @@ export default function Dashboard({ data }) {
 
   const CustomPieTooltip = ({ active, payload }) => {
     if (active && payload && payload.length) {
-      const data = payload[0].payload;
+      const item = payload[0].payload;
       return (
-        <div className="bg-slate-800/90 backdrop-blur border border-white/10 rounded-xl p-3 shadow-xl">
-          <p className="text-white font-medium mb-1">{data.category || data.name}</p>
-          <p className="text-slate-300 text-sm font-semibold">{formatCurrency(data.amount || data.value)}</p>
+        <div className="bg-slate-800/95 backdrop-blur border border-white/10 rounded-xl p-3 shadow-xl text-left">
+          <p className="text-white font-medium mb-1">{item.category || item.name}</p>
+          <p className="text-slate-200 text-sm font-bold">{formatCurrency(item.amount || item.value)}</p>
           {payload[0].percent !== undefined && (
-            <p className="text-slate-400 text-xs">{(payload[0].percent * 100).toFixed(1)}%</p>
+            <p className="text-violet-400 text-xs mt-0.5">{(payload[0].percent * 100).toFixed(1)}% of total</p>
           )}
         </div>
       );
@@ -37,7 +37,7 @@ export default function Dashboard({ data }) {
   const CustomBarTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
       return (
-        <div className="bg-slate-800/90 backdrop-blur border border-white/10 rounded-xl p-3 shadow-xl">
+        <div className="bg-slate-800/95 backdrop-blur border border-white/10 rounded-xl p-3 shadow-xl text-left">
           <p className="text-white font-medium mb-2">{label}</p>
           {payload.map((entry, index) => (
             <p key={index} className="text-sm flex items-center gap-2 mb-1" style={{ color: entry.fill }}>
@@ -91,8 +91,10 @@ export default function Dashboard({ data }) {
               <Wallet className={`w-5 h-5 ${netBalance >= 0 ? 'text-blue-400' : 'text-orange-400'}`} />
             </div>
             <div>
-              <p className="text-2xl font-bold text-white mb-1">{formatCurrency(netBalance)}</p>
-              <p className="text-sm text-slate-400">Net Balance</p>
+              <p className={`text-2xl font-bold mb-1 ${netBalance >= 0 ? 'text-blue-400' : 'text-orange-400'}`}>
+                {formatCurrency(netBalance)}
+              </p>
+              <p className="text-sm text-slate-400">Net Savings</p>
             </div>
           </div>
           <div className={`absolute right-0 top-0 h-full w-1 rounded-full bg-gradient-to-b ${netBalance >= 0 ? 'from-blue-400 to-blue-600' : 'from-orange-400 to-orange-600'}`} />
@@ -105,8 +107,8 @@ export default function Dashboard({ data }) {
               <Percent className="w-5 h-5 text-violet-400" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-white mb-1">{savingsRate.toFixed(1)}%</p>
-              <p className="text-sm text-slate-400">Savings Rate</p>
+              <p className="text-2xl font-bold text-white mb-1">{savingsRate > 0 ? savingsRate.toFixed(1) : '0.0'}%</p>
+              <p className="text-sm text-slate-400">Savings Ratio</p>
             </div>
           </div>
           <div className="absolute right-0 top-0 h-full w-1 rounded-full bg-gradient-to-b from-violet-400 to-violet-600" />
@@ -116,13 +118,13 @@ export default function Dashboard({ data }) {
       {/* AI Financial Tip */}
       <div className="ai-glow rounded-2xl bg-gradient-to-r from-violet-900/50 via-purple-900/30 to-fuchsia-900/50 border border-violet-500/30 p-6 relative overflow-hidden flex items-start gap-4">
         <div className="w-12 h-12 rounded-full bg-violet-500/20 border border-violet-500/30 flex items-center justify-center flex-shrink-0">
-          <Sparkles className="w-6 h-6 text-violet-400 animate-pulse-slow" />
+          <Sparkles className="w-6 h-6 text-amber-300 animate-pulse-slow" />
         </div>
         <div className="flex-1">
           <div className="inline-block px-2.5 py-1 rounded-full bg-violet-500/20 text-violet-300 text-xs font-semibold mb-2">
-            AI Insight
+            AI Gemini Advisor
           </div>
-          <p className="text-slate-200 text-sm md:text-base leading-relaxed">
+          <p className="text-slate-200 text-sm md:text-base leading-relaxed font-medium">
             {aiTip}
           </p>
         </div>
@@ -134,7 +136,10 @@ export default function Dashboard({ data }) {
         
         {/* Spending Breakdown */}
         <div className="glass-card p-6 h-96 flex flex-col">
-          <h3 className="text-lg font-semibold text-white mb-6">Spending Breakdown</h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-white">Spending Breakdown</h3>
+            <span className="text-xs text-slate-400">Category Share</span>
+          </div>
           <div className="flex-1 w-full min-h-0 relative">
             {spendingByCategory && spendingByCategory.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
@@ -145,7 +150,7 @@ export default function Dashboard({ data }) {
                     cy="45%"
                     innerRadius={65}
                     outerRadius={90}
-                    paddingAngle={2}
+                    paddingAngle={3}
                     dataKey="amount"
                     nameKey="category"
                   >
@@ -165,7 +170,7 @@ export default function Dashboard({ data }) {
             ) : (
               <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-500">
                 <PieChartIcon className="w-12 h-12 mb-3 text-slate-600" />
-                <p>No spending data yet</p>
+                <p>No expenses recorded this month</p>
               </div>
             )}
           </div>
@@ -173,28 +178,31 @@ export default function Dashboard({ data }) {
 
         {/* Budget vs Actual */}
         <div className="glass-card p-6 h-96 flex flex-col">
-          <h3 className="text-lg font-semibold text-white mb-6">Budget vs Actual</h3>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-white">Budget vs. Actual</h3>
+            <span className="text-xs text-slate-400">Spending Limits</span>
+          </div>
           <div className="flex-1 w-full min-h-0 relative">
             {budgetVsActual && budgetVsActual.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={budgetVsActual} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <BarChart data={budgetVsActual} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
                   <CartesianGrid stroke="#1e293b" vertical={false} />
-                  <XAxis dataKey="category" tick={{ fill: '#94a3b8', fontSize: 12 }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fill: '#94a3b8', fontSize: 12 }} axisLine={false} tickLine={false} tickFormatter={(value) => `₹${value}`} />
+                  <XAxis dataKey="category" tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fill: '#94a3b8', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(value) => `₹${value}`} />
                   <Tooltip content={<CustomBarTooltip />} cursor={{ fill: '#ffffff0a' }} />
                   <Legend 
                     verticalAlign="top" 
                     align="right"
                     iconType="circle"
-                    wrapperStyle={{ paddingBottom: '20px' }}
+                    wrapperStyle={{ paddingBottom: '10px' }}
                     formatter={(value) => <span className="text-slate-300 text-xs">{value}</span>}
                   />
-                  <Bar dataKey="budget" name="Budget" fill="#6366f1" radius={[4, 4, 0, 0]} maxBarSize={40} />
+                  <Bar dataKey="budget" name="Target Budget" fill="#6366f1" radius={[4, 4, 0, 0]} maxBarSize={32} />
                   <Bar 
                     dataKey="actual" 
-                    name="Actual"
+                    name="Actual Spent"
                     radius={[4, 4, 0, 0]}
-                    maxBarSize={40}
+                    maxBarSize={32}
                   >
                     {
                       budgetVsActual.map((entry, index) => (
@@ -207,13 +215,56 @@ export default function Dashboard({ data }) {
             ) : (
               <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-500">
                 <BarChart3 className="w-12 h-12 mb-3 text-slate-600" />
-                <p>Set budgets to compare</p>
+                <p>Set budget limits below to see comparison</p>
               </div>
             )}
           </div>
         </div>
 
       </div>
+
+      {/* Budget Health Progress Bars */}
+      {budgetVsActual && budgetVsActual.length > 0 && (
+        <div className="glass-card p-6">
+          <h3 className="text-base font-semibold text-white mb-4 flex items-center justify-between">
+            <span>Budget Utilization Health</span>
+            <span className="text-xs text-slate-400 font-normal">Monthly Status</span>
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {budgetVsActual.map((b, idx) => {
+              const percent = b.budget > 0 ? Math.round((b.actual / b.budget) * 100) : 0;
+              const isOver = percent > 100;
+              const isNear = percent >= 80 && percent <= 100;
+
+              return (
+                <div key={idx} className="bg-slate-900/60 p-3.5 rounded-xl border border-white/5 space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-medium text-slate-200">{b.category}</span>
+                    <span className={`font-bold ${isOver ? 'text-rose-400' : isNear ? 'text-amber-400' : 'text-emerald-400'}`}>
+                      {percent}%
+                    </span>
+                  </div>
+
+                  {/* Progress Bar */}
+                  <div className="w-full bg-slate-800 rounded-full h-2 overflow-hidden">
+                    <div 
+                      className={`h-full rounded-full transition-all duration-500 ${
+                        isOver ? 'bg-rose-500' : isNear ? 'bg-amber-500' : 'bg-emerald-500'
+                      }`}
+                      style={{ width: `${Math.min(percent, 100)}%` }}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between text-[11px] text-slate-400">
+                    <span>Spent: {formatCurrency(b.actual)}</span>
+                    <span>Limit: {formatCurrency(b.budget)}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

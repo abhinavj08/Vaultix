@@ -84,4 +84,9 @@ export const updateBudgets = async (budgets, month, year) => {
   return response.data;
 };
 
+export const askAI = async (question, month, year) => {
+  const response = await api.post('/api/dashboard/ask', { question, month, year });
+  return response.data;
+};
+
 export default api;

@@ -1,7 +1,7 @@
 import express from 'express';
 import prisma from '../lib/prisma.js';
 import { authenticate } from '../middleware/auth.js';
-import { generateMonthlyTip } from '../services/gemini.js';
+import { generateMonthlyTip, askFinancialAssistant } from '../services/gemini.js';
 
 const router = express.Router();
 
@@ -23,7 +23,8 @@ router.get('/summary', async (req, res) => {
           gte: startDate,
           lte: endDate
         }
-      }
+      },
+      orderBy: { date: 'desc' }
     });
     
     let totalIncome = 0;
@@ -98,7 +99,63 @@ router.get('/summary', async (req, res) => {
       year
     });
   } catch (error) {
-    console.error(error);
+    console.error('Error fetching dashboard summary:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// AI Chatbot endpoint for financial advice
+router.post('/ask', async (req, res) => {
+  try {
+    const { question, month, year } = req.body;
+    if (!question || !question.trim()) {
+      return res.status(400).json({ error: 'Question is required' });
+    }
+
+    const targetMonth = month ? parseInt(month) : new Date().getMonth() + 1;
+    const targetYear = year ? parseInt(year) : new Date().getFullYear();
+    const startDate = new Date(targetYear, targetMonth - 1, 1);
+    const endDate = new Date(targetYear, targetMonth, 0, 23, 59, 59, 999);
+
+    const transactions = await prisma.transaction.findMany({
+      where: {
+        userId: req.user.userId,
+        date: { gte: startDate, lte: endDate }
+      },
+      take: 20,
+      orderBy: { date: 'desc' }
+    });
+
+    let totalIncome = 0;
+    let totalExpenses = 0;
+    const expensesByCategory = {};
+
+    transactions.forEach(t => {
+      if (t.type === 'credit') {
+        totalIncome += t.amount;
+      } else {
+        totalExpenses += t.amount;
+        expensesByCategory[t.category] = (expensesByCategory[t.category] || 0) + t.amount;
+      }
+    });
+
+    const budgets = await prisma.budget.findMany({
+      where: { userId: req.user.userId, month: targetMonth, year: targetYear }
+    });
+
+    const contextData = {
+      totalIncome,
+      totalExpenses,
+      netBalance: totalIncome - totalExpenses,
+      spendingByCategory: Object.entries(expensesByCategory).map(([category, amount]) => ({ category, amount })),
+      budgetVsActual: budgets.map(b => ({ category: b.category, budget: b.limit, actual: expensesByCategory[b.category] || 0 })),
+      recentTransactions: transactions.map(t => ({ date: t.date, desc: t.description, amount: t.amount, category: t.category, type: t.type }))
+    };
+
+    const answer = await askFinancialAssistant(question.trim(), contextData);
+    res.json({ answer });
+  } catch (error) {
+    console.error('Error answering financial question:', error);
     res.status(500).json({ error: 'Internal Server Error' });
   }
 });

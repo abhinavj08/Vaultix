@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Plus, Upload, Trash2, Receipt, Sparkles } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { Plus, Upload, Trash2, Receipt, Sparkles, Search, Filter, Download, ArrowUpDown } from 'lucide-react';
 import { deleteTransaction } from '../api';
 import AddTransactionModal from './AddTransactionModal';
 import CSVUploadModal from './CSVUploadModal';
@@ -20,7 +20,7 @@ const CATEGORY_COLORS = {
 
 const formatDate = (dateString) => {
   const options = { day: 'numeric', month: 'short', year: 'numeric' };
-  return new Date(dateString).toLocaleDateString('en-GB', options);
+  return new Date(dateString).toLocaleDateString('en-IN', options);
 };
 
 const formatCurrency = (val) => {
@@ -31,6 +31,46 @@ export default function TransactionTable({ transactions = [], onRefresh }) {
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isCSVOpen, setIsCSVOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(null);
+
+  // Filters & Search
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('ALL');
+  const [selectedType, setSelectedType] = useState('ALL'); // ALL, debit, credit
+  const [sortBy, setSortBy] = useState('date-desc'); // date-desc, date-asc, amount-desc, amount-asc
+
+  const uniqueCategories = useMemo(() => {
+    const cats = new Set(transactions.map(t => t.category).filter(Boolean));
+    return ['ALL', ...Array.from(cats)];
+  }, [transactions]);
+
+  const filteredTransactions = useMemo(() => {
+    return transactions
+      .filter(tx => {
+        // Search filter
+        if (searchQuery.trim()) {
+          const q = searchQuery.toLowerCase();
+          const matchesDesc = (tx.description || '').toLowerCase().includes(q);
+          const matchesCat = (tx.category || '').toLowerCase().includes(q);
+          if (!matchesDesc && !matchesCat) return false;
+        }
+        // Category filter
+        if (selectedCategory !== 'ALL' && tx.category !== selectedCategory) {
+          return false;
+        }
+        // Type filter
+        if (selectedType !== 'ALL' && tx.type !== selectedType) {
+          return false;
+        }
+        return true;
+      })
+      .sort((a, b) => {
+        if (sortBy === 'date-desc') return new Date(b.date) - new Date(a.date);
+        if (sortBy === 'date-asc') return new Date(a.date) - new Date(b.date);
+        if (sortBy === 'amount-desc') return b.amount - a.amount;
+        if (sortBy === 'amount-asc') return a.amount - b.amount;
+        return 0;
+      });
+  }, [transactions, searchQuery, selectedCategory, selectedType, sortBy]);
 
   const handleDelete = async (id) => {
     if (!window.confirm('Are you sure you want to delete this transaction?')) return;
@@ -47,37 +87,132 @@ export default function TransactionTable({ transactions = [], onRefresh }) {
     }
   };
 
+  const exportCSV = () => {
+    if (filteredTransactions.length === 0) return;
+    const headers = ['Date', 'Description', 'Category', 'Amount (INR)', 'Type'];
+    const rows = filteredTransactions.map(t => [
+      new Date(t.date).toISOString().split('T')[0],
+      `"${(t.description || '').replace(/"/g, '""')}"`,
+      `"${t.category || 'Other'}"`,
+      t.amount,
+      t.type
+    ]);
+
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `Vaultix_Transactions_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <div className="glass-card overflow-hidden">
       {/* Header section */}
       <div className="p-6 border-b border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <h2 className="text-xl font-bold text-white">Transactions</h2>
-          <span className="text-xs bg-white/10 text-slate-400 px-2 py-0.5 rounded-full">
-            {transactions.length}
+          <span className="text-xs bg-white/10 text-slate-400 px-2.5 py-0.5 rounded-full font-medium">
+            {filteredTransactions.length} of {transactions.length}
           </span>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2.5">
+          <button 
+            onClick={exportCSV}
+            disabled={filteredTransactions.length === 0}
+            className="btn-ghost text-xs py-2 px-3 flex items-center gap-1.5 disabled:opacity-40"
+            title="Download filtered transactions as CSV"
+          >
+            <Download className="w-3.5 h-3.5" />
+            Export CSV
+          </button>
           <button 
             onClick={() => setIsCSVOpen(true)}
-            className="btn-ghost text-sm py-2 px-3 flex items-center gap-2"
+            className="btn-ghost text-xs py-2 px-3 flex items-center gap-1.5"
           >
-            <Upload className="w-4 h-4" />
-            Upload CSV
+            <Upload className="w-3.5 h-3.5" />
+            Import CSV
           </button>
           <button 
             onClick={() => setIsAddOpen(true)}
-            className="btn-primary text-sm py-2 px-3 flex items-center gap-2"
+            className="btn-primary text-xs py-2 px-3.5 flex items-center gap-1.5"
           >
-            <Plus className="w-4 h-4" />
+            <Plus className="w-3.5 h-3.5" />
             Add Transaction
-            <Sparkles className="w-3 h-3 ml-1 text-violet-300" />
+            <Sparkles className="w-3 h-3 ml-0.5 text-amber-300" />
           </button>
         </div>
       </div>
 
+      {/* Filter and Search Bar */}
+      <div className="p-4 bg-white/[0.02] border-b border-white/5 flex flex-col md:flex-row gap-3 items-center justify-between">
+        {/* Search */}
+        <div className="relative w-full md:w-72">
+          <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search merchant, notes..."
+            className="w-full pl-9 pr-3 py-1.5 bg-slate-900/80 border border-white/10 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
+          />
+        </div>
+
+        {/* Filters Group */}
+        <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto justify-end">
+          {/* Type Filter */}
+          <div className="inline-flex rounded-xl bg-slate-900/80 p-0.5 border border-white/10 text-xs">
+            <button
+              onClick={() => setSelectedType('ALL')}
+              className={`px-2.5 py-1 rounded-lg transition-all ${selectedType === 'ALL' ? 'bg-violet-600 text-white font-medium' : 'text-slate-400 hover:text-white'}`}
+            >
+              All
+            </button>
+            <button
+              onClick={() => setSelectedType('debit')}
+              className={`px-2.5 py-1 rounded-lg transition-all ${selectedType === 'debit' ? 'bg-rose-500/20 text-rose-400 font-medium' : 'text-slate-400 hover:text-white'}`}
+            >
+              Expenses
+            </button>
+            <button
+              onClick={() => setSelectedType('credit')}
+              className={`px-2.5 py-1 rounded-lg transition-all ${selectedType === 'credit' ? 'bg-emerald-500/20 text-emerald-400 font-medium' : 'text-slate-400 hover:text-white'}`}
+            >
+              Income
+            </button>
+          </div>
+
+          {/* Category Dropdown */}
+          <select
+            value={selectedCategory}
+            onChange={(e) => setSelectedCategory(e.target.value)}
+            className="bg-slate-900/80 border border-white/10 rounded-xl text-xs text-slate-300 px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-violet-500"
+          >
+            {uniqueCategories.map(cat => (
+              <option key={cat} value={cat} className="bg-slate-900 text-white">
+                {cat === 'ALL' ? 'All Categories' : cat}
+              </option>
+            ))}
+          </select>
+
+          {/* Sort Dropdown */}
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
+            className="bg-slate-900/80 border border-white/10 rounded-xl text-xs text-slate-300 px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-violet-500"
+          >
+            <option value="date-desc" className="bg-slate-900 text-white">Date: Newest First</option>
+            <option value="date-asc" className="bg-slate-900 text-white">Date: Oldest First</option>
+            <option value="amount-desc" className="bg-slate-900 text-white">Amount: Highest First</option>
+            <option value="amount-asc" className="bg-slate-900 text-white">Amount: Lowest First</option>
+          </select>
+        </div>
+      </div>
+
       {/* Table section */}
-      {transactions.length > 0 ? (
+      {filteredTransactions.length > 0 ? (
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
@@ -85,13 +220,13 @@ export default function TransactionTable({ transactions = [], onRefresh }) {
                 <th className="p-4 pl-6 font-medium">Date</th>
                 <th className="p-4 font-medium">Description</th>
                 <th className="p-4 font-medium">Category</th>
-                <th className="p-4 font-medium text-right">Amount</th>
+                <th className="p-4 font-medium text-right">Amount (₹)</th>
                 <th className="p-4 font-medium text-center">Type</th>
                 <th className="p-4 pr-6 font-medium text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
-              {transactions.map((tx) => {
+              {filteredTransactions.map((tx) => {
                 const categoryStyle = CATEGORY_COLORS[tx.category] || CATEGORY_COLORS['Other'];
                 const isCredit = tx.type === 'credit';
                 
@@ -100,7 +235,7 @@ export default function TransactionTable({ transactions = [], onRefresh }) {
                     <td className="p-4 pl-6 text-sm text-slate-400 whitespace-nowrap">
                       {formatDate(tx.date)}
                     </td>
-                    <td className="p-4 text-sm font-medium text-white max-w-[200px] truncate">
+                    <td className="p-4 text-sm font-medium text-white max-w-[220px] truncate">
                       {tx.description}
                     </td>
                     <td className="p-4">
@@ -142,17 +277,23 @@ export default function TransactionTable({ transactions = [], onRefresh }) {
           <div className="h-16 w-16 bg-white/5 rounded-full flex items-center justify-center mb-4 border border-white/5">
             <Receipt className="h-8 w-8 text-slate-500" />
           </div>
-          <h3 className="text-lg font-medium text-white mb-1">No transactions yet</h3>
+          <h3 className="text-lg font-medium text-white mb-1">
+            {transactions.length === 0 ? 'No transactions yet' : 'No matching transactions'}
+          </h3>
           <p className="text-sm text-slate-500 mb-6 max-w-sm">
-            Add your first transaction manually or import a CSV file to start tracking your finances.
+            {transactions.length === 0 
+              ? 'Add your first transaction manually or paste raw SMS text above.' 
+              : 'Try clearing your search or changing the selected category filter.'}
           </p>
-          <button 
-            onClick={() => setIsAddOpen(true)}
-            className="btn-primary flex items-center gap-2"
-          >
-            <Plus className="w-4 h-4" />
-            Add First Transaction
-          </button>
+          {transactions.length === 0 && (
+            <button 
+              onClick={() => setIsAddOpen(true)}
+              className="btn-primary flex items-center gap-2"
+            >
+              <Plus className="w-4 h-4" />
+              Add First Transaction
+            </button>
+          )}
         </div>
       )}
 

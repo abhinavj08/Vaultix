@@ -15,6 +15,7 @@ import Dashboard from '../components/Dashboard';
 import SmartInputArea from '../components/SmartInputArea';
 import TransactionTable from '../components/TransactionTable';
 import BudgetSettings from '../components/BudgetSettings';
+import AIAssistantDrawer from '../components/AIAssistantDrawer';
 import { getDashboard, getTransactions, getBudgets } from '../api';
 import { useAuth } from '../context/AuthContext';
 
@@ -249,6 +250,9 @@ export default function DashboardPage() {
           </div>
         </main>
       </div>
+
+      {/* Floating AI Financial Assistant */}
+      <AIAssistantDrawer month={selectedMonth} year={selectedYear} />
     </div>
   );
 }
