@@ -23,9 +23,11 @@ export default function Dashboard({ data }) {
       const data = payload[0].payload;
       return (
         <div className="bg-slate-800/90 backdrop-blur border border-white/10 rounded-xl p-3 shadow-xl">
-          <p className="text-white font-medium mb-1">{data.name}</p>
-          <p className="text-slate-300 text-sm">{formatCurrency(data.value)}</p>
-          <p className="text-slate-400 text-xs">{(payload[0].percent * 100).toFixed(1)}%</p>
+          <p className="text-white font-medium mb-1">{data.category || data.name}</p>
+          <p className="text-slate-300 text-sm font-semibold">{formatCurrency(data.amount || data.value)}</p>
+          {payload[0].percent !== undefined && (
+            <p className="text-slate-400 text-xs">{(payload[0].percent * 100).toFixed(1)}%</p>
+          )}
         </div>
       );
     }
@@ -144,7 +146,8 @@ export default function Dashboard({ data }) {
                     innerRadius={65}
                     outerRadius={90}
                     paddingAngle={2}
-                    dataKey="value"
+                    dataKey="amount"
+                    nameKey="category"
                   >
                     {spendingByCategory.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />

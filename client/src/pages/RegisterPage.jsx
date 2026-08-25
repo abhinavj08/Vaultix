@@ -36,7 +36,7 @@ const RegisterPage = () => {
     setLoading(true);
     try {
       await register(name, email, password);
-      navigate('/dashboard');
+      navigate('/');
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to create account. Please try again.');
     } finally {

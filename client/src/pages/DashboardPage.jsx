@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   LayoutDashboard, 
   Receipt, 
@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import MonthPicker from '../components/MonthPicker';
 import Dashboard from '../components/Dashboard';
+import SmartInputArea from '../components/SmartInputArea';
 import TransactionTable from '../components/TransactionTable';
 import BudgetSettings from '../components/BudgetSettings';
 import { getDashboard, getTransactions, getBudgets } from '../api';
@@ -31,28 +32,28 @@ export default function DashboardPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('dashboard');
 
-  useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      try {
-        const [dashRes, transRes, budgRes] = await Promise.all([
-          getDashboard(selectedMonth, selectedYear),
-          getTransactions(selectedMonth, selectedYear),
-          getBudgets()
-        ]);
-        
-        setDashboardData(dashRes || {});
-        setTransactions(transRes.transactions || []);
-        setBudgets(budgRes.budgets || []);
-      } catch (error) {
-        console.error('Error fetching dashboard data:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    fetchData();
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [dashRes, transRes, budgRes] = await Promise.all([
+        getDashboard(selectedMonth, selectedYear),
+        getTransactions(selectedMonth, selectedYear),
+        getBudgets(selectedMonth, selectedYear)
+      ]);
+      
+      setDashboardData(dashRes || {});
+      setTransactions(transRes.transactions || []);
+      setBudgets(budgRes.budgets || []);
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+    } finally {
+      setLoading(false);
+    }
   }, [selectedMonth, selectedYear]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const handleMonthChange = (newMonth, newYear) => {
     setSelectedMonth(newMonth);
@@ -63,10 +64,13 @@ export default function DashboardPage() {
     { id: 'dashboard', icon: LayoutDashboard, tooltip: 'Dashboard' },
     { id: 'transactions', icon: Receipt, tooltip: 'Transactions' },
     { id: 'budgets', icon: PieChartIcon, tooltip: 'Budgets' },
-    { id: 'settings', icon: Settings, tooltip: 'Settings' }
   ];
 
-  const currentDate = new Date().toLocaleDateString('en-US', { 
+  // Dynamic greeting based on time of day
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+
+  const currentDate = new Date().toLocaleDateString('en-IN', { 
     weekday: 'long', 
     year: 'numeric', 
     month: 'long', 
@@ -93,39 +97,60 @@ export default function DashboardPage() {
     switch (activeTab) {
       case 'dashboard':
         return (
-          <>
-            <div className="mb-8">
+          <div className="space-y-8">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <MonthPicker month={selectedMonth} year={selectedYear} onChange={handleMonthChange} />
             </div>
+
+            {/* Metrics & AI Insight & Charts */}
             <Dashboard data={dashboardData} />
-            <div className="mt-8">
-              <h2 className="text-xl font-bold text-white mb-4">Recent Transactions</h2>
-              <TransactionTable transactions={transactions.slice(0, 5)} onRefresh={() => {}} preview={true} />
-            </div>
-          </>
+
+            {/* Prominent Smart AI Input Area */}
+            <SmartInputArea onTransactionAdded={fetchData} />
+
+            {/* Transaction Table */}
+            <TransactionTable transactions={transactions} onRefresh={fetchData} />
+
+            {/* Budget Settings */}
+            <BudgetSettings 
+              budgets={budgets} 
+              month={selectedMonth} 
+              year={selectedYear} 
+              onUpdate={fetchData} 
+            />
+          </div>
         );
       case 'transactions':
         return (
-          <>
-            <div className="mb-8">
+          <div className="space-y-6">
+            <div className="flex justify-between items-center">
               <MonthPicker month={selectedMonth} year={selectedYear} onChange={handleMonthChange} />
             </div>
-            <TransactionTable transactions={transactions} onRefresh={() => {}} />
-          </>
+            <SmartInputArea onTransactionAdded={fetchData} />
+            <TransactionTable transactions={transactions} onRefresh={fetchData} />
+          </div>
         );
       case 'budgets':
         return (
-          <BudgetSettings budgets={budgets} onRefresh={() => {}} />
+          <div className="space-y-6">
+            <div className="flex justify-between items-center">
+              <MonthPicker month={selectedMonth} year={selectedYear} onChange={handleMonthChange} />
+            </div>
+            <BudgetSettings 
+              budgets={budgets} 
+              month={selectedMonth} 
+              year={selectedYear} 
+              onUpdate={fetchData} 
+            />
+          </div>
         );
-      case 'settings':
-        return <div className="text-white p-6 glass-card">Settings coming soon...</div>;
       default:
         return null;
     }
   };
 
   return (
-    <div className="flex h-screen bg-slate-950 font-['Inter'] overflow-hidden">
+    <div className="flex h-screen bg-slate-950 font-['Inter',sans-serif] overflow-hidden text-slate-200">
       
       {/* Mobile Sidebar Overlay */}
       {sidebarOpen && (
@@ -176,7 +201,7 @@ export default function DashboardPage() {
         {/* Logout */}
         <button
           onClick={logout}
-          className="w-full aspect-square text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-xl flex items-center justify-center transition-all px-3"
+          className="w-full aspect-square text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-xl flex items-center justify-center transition-all px-3"
           title="Log out"
         >
           <LogOut className="w-6 h-6" />
@@ -196,11 +221,11 @@ export default function DashboardPage() {
               <Menu className="w-6 h-6" />
             </button>
             
-            <div className="hidden sm:block">
+            <div>
               <h1 className="text-xl font-bold text-white flex items-center gap-2">
-                Good afternoon, {user?.name || 'User'} <span className="text-2xl">👋</span>
+                {greeting}, {user?.name || 'Explorer'} <span className="text-2xl">👋</span>
               </h1>
-              <p className="text-sm text-slate-400">{currentDate}</p>
+              <p className="text-xs sm:text-sm text-slate-400">{currentDate}</p>
             </div>
           </div>
 
@@ -208,9 +233,9 @@ export default function DashboardPage() {
             <div className="flex items-center gap-3">
               <div className="hidden sm:block text-right">
                 <p className="text-sm font-medium text-white">{user?.name || 'User'}</p>
-                <button onClick={logout} className="text-xs text-slate-500 hover:text-white transition-colors">Sign out</button>
+                <button onClick={logout} className="text-xs text-slate-500 hover:text-rose-400 transition-colors">Sign out</button>
               </div>
-              <div className="w-10 h-10 rounded-full bg-violet-600 flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-violet-500/20 border border-white/10">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-violet-600 to-fuchsia-600 flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-violet-500/20 border border-white/10">
                 {(user?.name || 'U').charAt(0).toUpperCase()}
               </div>
             </div>
@@ -218,7 +243,7 @@ export default function DashboardPage() {
         </header>
 
         {/* Scrollable Content */}
-        <main className="flex-1 overflow-y-auto p-6 lg:p-8">
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
           <div className="max-w-7xl mx-auto">
             {renderContent()}
           </div>
