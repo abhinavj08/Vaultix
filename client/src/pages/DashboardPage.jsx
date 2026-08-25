@@ -14,7 +14,6 @@ import MonthPicker from '../components/MonthPicker';
 import Dashboard from '../components/Dashboard';
 import TransactionTable from '../components/TransactionTable';
 import BudgetSettings from '../components/BudgetSettings';
-import { getDashboard, getTransactions, getBudgets } from '../services/api';
 import { getDashboard, getTransactions, getBudgets } from '../api';
 import { useAuth } from '../context/AuthContext';
 
